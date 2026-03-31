@@ -1,0 +1,226 @@
+Python 3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)] on win32
+Type "help", "copyright", "credits" or "license()" for more information.
+"""
+Mess Menu Nutrition Tracker
+Tracks daily food intake from mess menu and calculates nutrition
+"""
+
+import json
+import os
+from datetime import datetime
+
+# Food database (simplified nutrition data)
+FOOD_DB = {
+    # Breakfast items
+    "idli": {"carbs": 15, "protein": 3, "calories": 70, "type": "breakfast"},
+    "dosa": {"carbs": 30, "protein": 4, "calories": 150, "type": "breakfast"},
+    "poha": {"carbs": 25, "protein": 3, "calories": 180, "type": "breakfast"},
+    "upma": {"carbs": 28, "protein": 4, "calories": 200, "type": "breakfast"},
+    "sambar": {"carbs": 10, "protein": 2, "calories": 60, "type": "side"},
+    
+    # Lunch items
+    "rice": {"carbs": 45, "protein": 4, "calories": 200, "type": "lunch"},
+    "chapati": {"carbs": 15, "protein": 3, "calories": 120, "type": "lunch"},
+    "dal": {"carbs": 20, "protein": 7, "calories": 150, "type": "lunch"},
+    "curry": {"carbs": 15, "protein": 5, "calories": 180, "type": "lunch"},
+    "curd": {"carbs": 5, "protein": 4, "calories": 80, "type": "side"},
+    
+    # Dinner items
+    "noodles": {"carbs": 50, "protein": 6, "calories": 250, "type": "dinner"},
+    "fried rice": {"carbs": 55, "protein": 7, "calories": 280, "type": "dinner"},
+    "paneer": {"carbs": 10, "protein": 15, "calories": 220, "type": "dinner"},
+    "soup": {"carbs": 8, "protein": 2, "calories": 50, "type": "dinner"},
+    
+    # Snacks
+    "samosa": {"carbs": 25, "protein": 3, "calories": 260, "type": "snack"},
+    "pakora": {"carbs": 20, "protein": 4, "calories": 280, "type": "snack"}
+}
+
+class MessNutritionTracker:
+    def __init__(self, data_file="nutrition_data.json"):
+        self.data_file = data_file
+        self.today = datetime.now().strftime("%Y-%m-%d")
+        self.load_data()
+    
+    def load_data(self):
+        """Load existing data from file"""
+        if os.path.exists(self.data_file):
+            with open(self.data_file, 'r') as f:
+                self.data = json.load(f)
+        else:
+            self.data = {}
+    
+    def save_data(self):
+        """Save data to file"""
+        with open(self.data_file, 'w') as f:
+            json.dump(self.data, f, indent=2)
+    
+    def log_meal(self, meal_type, food_items):
+        """
+        Log a meal with multiple food items
+        meal_type: breakfast, lunch, dinner, snack
+        food_items: list of food names
+        """
+        if self.today not in self.data:
+            self.data[self.today] = {}
+        
+        # Calculate nutrition for this meal
+        total_nutrition = {"carbs": 0, "protein": 0, "calories": 0}
+        tracked_items = []
+        
+        for food in food_items:
+            food_lower = food.lower()
+            if food_lower in FOOD_DB:
+                nutrition = FOOD_DB[food_lower]
+                total_nutrition["carbs"] += nutrition["carbs"]
+                total_nutrition["protein"] += nutrition["protein"]
+                total_nutrition["calories"] += nutrition["calories"]
+                tracked_items.append(food)
+            else:
+                print(f"⚠️ '{food}' not found in database. Skipping.")
+        
+        # Store the meal
+        self.data[self.today][meal_type] = {
+            "items": tracked_items,
+            "nutrition": total_nutrition
+        }
+        
+        self.save_data()
+        print(f"✅ Logged {meal_type}: {', '.join(tracked_items)}")
+        print(f"   Carbs: {total_nutrition['carbs']}g | Protein: {total_nutrition['protein']}g | Calories: {total_nutrition['calories']}")
+    
+    def view_today_summary(self):
+        """View today's total nutrition"""
+        if self.today not in self.data:
+            print("📭 No meals logged today")
+            return
+        
+        daily_total = {"carbs": 0, "protein": 0, "calories": 0}
+        meals = self.data[self.today]
+        
+        print(f"\n📊 Summary for {self.today}")
+        print("-" * 40)
+        
+        for meal_type, meal_data in meals.items():
+            nut = meal_data["nutrition"]
+            print(f"{meal_type.upper()}: {', '.join(meal_data['items'])}")
+            print(f"  → Carbs: {nut['carbs']}g | Protein: {nut['protein']}g | Cal: {nut['calories']}")
+            
+            daily_total["carbs"] += nut["carbs"]
+            daily_total["protein"] += nut["protein"]
+            daily_total["calories"] += nut["calories"]
+        
+        print("-" * 40)
+        print(f"📈 TOTAL for today:")
+        print(f"   Carbohydrates: {daily_total['carbs']}g")
+        print(f"   Protein: {daily_total['protein']}g")
+        print(f"   Calories: {daily_total['calories']}")
+        
+        # Simple feedback
+        if daily_total["calories"] > 2000:
+            print("⚠️ High calorie intake today")
+        elif daily_total["calories"] < 1500:
+            print("⚠️ Low calorie intake today")
+        else:
+            print("✅ Good calorie range!")
+    
+    def view_weekly_report(self):
+        """View last 7 days summary"""
+        last_7_days = []
+        current_date = datetime.now()
+        
+        print("\n📅 WEEKLY NUTRITION REPORT")
+        print("=" * 50)
+        
+        for i in range(7):
+            date = (current_date - __import__('datetime').timedelta(days=i)).strftime("%Y-%m-%d")
+            if date in self.data:
+                daily_calories = 0
+                for meal in self.data[date].values():
+                    daily_calories += meal["nutrition"]["calories"]
+                print(f"{date}: {daily_calories} calories")
+                last_7_days.append(daily_calories)
+            else:
+                print(f"{date}: No data")
+        
+        if last_7_days:
+            avg_calories = sum(last_7_days) / len(last_7_days)
+            print(f"\n📊 Weekly Average: {avg_calories:.0f} calories/day")
+    
+    def view_available_foods(self):
+        """Show all foods in database"""
+        print("\n🍽️ AVAILABLE FOODS IN DATABASE:")
+        print("-" * 40)
+        for food, info in FOOD_DB.items():
+            print(f"  {food.capitalize()}: {info['calories']} cal | {info['protein']}g protein")
+    
+    def delete_today(self):
+        """Delete today's data"""
+        if self.today in self.data:
+            del self.data[self.today]
+            self.save_data()
+            print(f"🗑️ Deleted today's data")
+        else:
+            print("No data for today to delete")
+
+def main():
+    tracker = MessNutritionTracker()
+    
+    while True:
+        print("\n" + "="*50)
+        print("🍽️ MESS NUTRITION TRACKER")
+        print("="*50)
+        print("1. Log Breakfast")
+        print("2. Log Lunch")
+        print("3. Log Dinner")
+        print("4. Log Snack")
+        print("5. View Today's Summary")
+        print("6. View Weekly Report")
+        print("7. View Available Foods")
+        print("8. Delete Today's Data")
+...         print("9. Exit")
+...         
+...         choice = input("\nEnter your choice (1-9): ")
+...         
+...         if choice == '1':
+...             items = input("What did you eat for breakfast? (comma-separated, e.g., idli,sambar): ").split(',')
+...             items = [item.strip() for item in items]
+...             tracker.log_meal("breakfast", items)
+...         
+...         elif choice == '2':
+...             items = input("What did you eat for lunch? (comma-separated, e.g., rice,dal): ").split(',')
+...             items = [item.strip() for item in items]
+...             tracker.log_meal("lunch", items)
+...         
+...         elif choice == '3':
+...             items = input("What did you eat for dinner? (comma-separated, e.g., chapati,curry): ").split(',')
+...             items = [item.strip() for item in items]
+...             tracker.log_meal("dinner", items)
+...         
+...         elif choice == '4':
+...             items = input("What did you eat as snack? (comma-separated, e.g., samosa): ").split(',')
+...             items = [item.strip() for item in items]
+...             tracker.log_meal("snack", items)
+...         
+...         elif choice == '5':
+...             tracker.view_today_summary()
+...         
+...         elif choice == '6':
+...             tracker.view_weekly_report()
+...         
+...         elif choice == '7':
+...             tracker.view_available_foods()
+...         
+...         elif choice == '8':
+...             confirm = input("Are you sure? (yes/no): ")
+...             if confirm.lower() == 'yes':
+...                 tracker.delete_today()
+...         
+...         elif choice == '9':
+...             print("👋 Goodbye! Stay healthy!")
+...             break
+...         
+...         else:
+...             print("❌ Invalid choice. Please try again.")
+... 
+... if __name__ == "__main__":
